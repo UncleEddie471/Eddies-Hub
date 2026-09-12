@@ -104,6 +104,13 @@ local CATEGORIES = {
                 icon  = "📦",
                 url   = "https://raw.githubusercontent.com/newestscript/mm2sources/refs/heads/main/murder.mystery2",
             },
+            {
+                name  = "Xena Hub - Freeze Trade",
+                key   = "Keyless",
+                desc  = "Freeze trades in MM2 to prevent scams",
+                icon  = "🔒",
+                url   = "https://raw.githubusercontent.com/CratosHub-Dev/XenaHub/refs/heads/main/MM2FreezeTrade",
+            },
         },
     },
 }
