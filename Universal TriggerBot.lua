@@ -1,576 +1,567 @@
--- ============================================================
--- Eddie's Hub  |  Script Loader
--- ============================================================
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
 
--- Cleanup old instance
-pcall(function()
-    for _, g in ipairs(game:GetService("CoreGui"):GetChildren()) do
-        if g.Name == "EddiesHub_Loader" then g:Destroy() end
-    end
-    for _, g in ipairs(game:GetService("Players").LocalPlayer.PlayerGui:GetChildren()) do
-        if g.Name == "EddiesHub_Loader" then g:Destroy() end
-    end
-end)
+local lp = Players.LocalPlayer
+local mouse = lp:GetMouse()
 
-local Players    = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local UIS        = game:GetService("UserInputService")
-local plr        = Players.LocalPlayer
+local shootKey = nil
+local listening = false
+local isSimulating = false
+local alwaysOn = false
+local headMult = 1
+local originalHeadSizes = {}
+local espEnabled = false
+local highlights = {}
+local npcHighlights = {}
+local whitelist = {}
 
--- ── Find best GUI parent ──────────────────────────────────
-local uiParent
-if gethui then
-    uiParent = gethui()
-else
-    local ok = pcall(function()
-        local t = Instance.new("ScreenGui")
-        t.Parent = game:GetService("CoreGui")
-        t:Destroy()
-    end)
-    uiParent = ok and game:GetService("CoreGui") or plr:WaitForChild("PlayerGui")
-end
-
--- ── Colors ────────────────────────────────────────────────
-local C = {
-    bg        = Color3.fromRGB(18, 18, 18),
-    sidebar   = Color3.fromRGB(24, 24, 24),
-    card      = Color3.fromRGB(38, 38, 38),
-    cardHov   = Color3.fromRGB(48, 48, 48),
-    accent    = Color3.fromRGB(235, 100, 60),   -- Eddie orange
-    accentDim = Color3.fromRGB(120, 50, 30),
-    text      = Color3.fromRGB(240, 240, 240),
-    textDim   = Color3.fromRGB(150, 150, 150),
-    white     = Color3.fromRGB(255, 255, 255),
-    border    = Color3.fromRGB(55, 55, 55),
-    green     = Color3.fromRGB(80, 205, 80),
-    red       = Color3.fromRGB(220, 60, 60),
-    yellow    = Color3.fromRGB(220, 180, 50),
-    tabSel    = Color3.fromRGB(38, 38, 38),
-}
-
--- ── Script data ───────────────────────────────────────────
-local CATEGORIES = {
-    {
-        name  = "Universal",
-        icon  = "🌐",
-        color = Color3.fromRGB(90, 140, 220),
-        scripts = {
-            {
-                name  = "Universal TriggerBot",
-                key   = "Keyless",
-                desc  = "Auto-trigger, customisable keybind, always-on mode & friend whitelist",
-                icon  = "⚡",
-                url   = "https://raw.githubusercontent.com/UncleEddie471/Eddies-Hub/refs/heads/main/TriggerBot",
-            },
-            {
-                name  = "Universal Aimbot",
-                key   = "Keyless",
-                desc  = "Silent aim, FOV circle, smooth aim, prediction & ESP — works on any game",
-                icon  = "🎯",
-                url   = "https://raw.githubusercontent.com/UncleEddie471/Universal-Aimbot/refs/heads/main/EddiesHub_aimbot.lua",
-            },
-        },
-    },
-    {
-        name  = "Murder Mystery 2",
-        icon  = "🔪",
-        color = Color3.fromRGB(220, 80, 60),
-        scripts = {
-            {
-                name  = "Vertex Hub",
-                key   = "Keyless",
-                desc  = "Complete MM2 hub — Aimbot, ESP, Auto Farm, Teleport",
-                icon  = "🎯",
-                url   = "https://raw.githubusercontent.com/CratosHub-Dev/MurderMyster-2/refs/heads/main/VertexHub",
-            },
-            {
-                name  = "Premium Aimbot",
-                key   = "Keyless",
-                desc  = "High-precision MM2 aimbot with silent aim & advanced targeting",
-                icon  = "💎",
-                url   = "https://raw.githubusercontent.com/CratosHub-Dev/MurderMystery2-/refs/heads/main/PremiumAimbot",
-            },
-            {
-                name  = "Exodus Hub",
-                key   = "Keyless",
-                desc  = "Full MM2 utility hub — Aimbot, ESP, Auto Farm & more",
-                icon  = "⚔️",
-                url   = "https://raw.githubusercontent.com/CratosHub-Dev/ExodusHub/refs/heads/main/ExodusMM2",
-            },
-            {
-                name  = "MM2 Spawner",
-                key   = "Keyless",
-                desc  = "Spawn any item/weapon in MM2 instantly",
-                icon  = "📦",
-                url   = "https://raw.githubusercontent.com/newestscript/mm2sources/refs/heads/main/murder.mystery2",
-            },
-            {
-                name  = "Xena Hub - Freeze Trade",
-                key   = "Keyless",
-                desc  = "Freeze trades in MM2 to prevent scams",
-                icon  = "🔒",
-                url   = "https://raw.githubusercontent.com/CratosHub-Dev/XenaHub/refs/heads/main/MM2FreezeTrade",
-            },
-        },
-    },
-}
-
--- ── ScreenGui ─────────────────────────────────────────────
 local gui = Instance.new("ScreenGui")
-gui.Name            = "EddiesHub_Loader"
-gui.ResetOnSpawn    = false
-gui.DisplayOrder    = 999
-gui.IgnoreGuiInset  = true
-gui.Enabled         = true
-gui.Parent          = uiParent
+gui.Name = "ShootBind"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = gethui()
 
--- ── Main window ───────────────────────────────────────────
-local win = Instance.new("Frame", gui)
-win.Name                = "Window"
-win.Size                = UDim2.new(0, 540, 0, 380)
-win.Position            = UDim2.new(0.5, -270, 0.5, -190)
-win.BackgroundColor3    = C.bg
-win.BorderSizePixel     = 0
-win.Active              = true
-win.ClipsDescendants    = true
-Instance.new("UICorner", win).CornerRadius = UDim.new(0, 12)
-local winStroke = Instance.new("UIStroke", win)
-winStroke.Color     = C.border
-winStroke.Thickness = 1
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 230, 0, 265)
+main.Position = UDim2.new(0.5, -115, 0.5, -132)
+main.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
+main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
 
--- ── Title bar ─────────────────────────────────────────────
-local bar = Instance.new("Frame", win)
-bar.Size             = UDim2.new(1, 0, 0, 38)
-bar.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
-bar.BorderSizePixel  = 0
+local stroke = Instance.new("UIStroke", main)
+stroke.Color = Color3.fromRGB(45, 45, 45)
+stroke.Thickness = 1
 
-local barDiv = Instance.new("Frame", bar)
-barDiv.Size             = UDim2.new(1, 0, 0, 1)
-barDiv.Position         = UDim2.new(0, 0, 1, -1)
-barDiv.BackgroundColor3 = C.border
-barDiv.BorderSizePixel  = 0
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, 0, 0, 18)
+label.Position = UDim2.new(0, 0, 0, 3)
+label.BackgroundTransparency = 1
+label.Text = "Made by Eddie's Hub"
+label.TextColor3 = Color3.fromRGB(120, 120, 120)
+label.TextSize = 11
+label.Font = Enum.Font.GothamMedium
+label.Parent = main
 
--- Traffic light buttons (clickable)
-local function trafficBtn(parent, x, col, symbol)
-    local btn = Instance.new("TextButton", parent)
-    btn.Size             = UDim2.new(0, 14, 0, 14)
-    btn.Position         = UDim2.new(0, x, 0.5, -7)
-    btn.BackgroundColor3 = col
-    btn.BorderSizePixel  = 0
-    btn.Text             = ""
-    btn.AutoButtonColor  = false
-    btn.ZIndex           = 10
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
-    local sym = Instance.new("TextLabel", btn)
-    sym.Size                = UDim2.new(1, 0, 1, 0)
-    sym.BackgroundTransparency = 1
-    sym.Text                = symbol
-    sym.TextColor3          = Color3.fromRGB(0, 0, 0)
-    sym.Font                = Enum.Font.GothamBlack
-    sym.TextSize            = 9
-    sym.TextTransparency    = 1
-    sym.ZIndex              = 11
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(sym, TweenInfo.new(0.1), {TextTransparency = 0}):Play()
-        TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = col:Lerp(Color3.fromRGB(255,255,255), 0.25)}):Play()
-    end)
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(sym, TweenInfo.new(0.1), {TextTransparency = 1}):Play()
-        TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = col}):Play()
-    end)
-    return btn
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(1, -20, 0, 22)
+btn.Position = UDim2.new(0, 10, 0, 23)
+btn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+btn.BorderSizePixel = 0
+btn.Text = "Shoot Keybind: [ none ]"
+btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+btn.TextSize = 12
+btn.Font = Enum.Font.GothamMedium
+btn.Parent = main
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", btn).Color = Color3.fromRGB(50, 50, 50)
+
+local alwaysBtn = Instance.new("TextButton")
+alwaysBtn.Size = UDim2.new(1, -20, 0, 22)
+alwaysBtn.Position = UDim2.new(0, 10, 0, 50)
+alwaysBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+alwaysBtn.BorderSizePixel = 0
+alwaysBtn.Text = "Always On: OFF"
+alwaysBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+alwaysBtn.TextSize = 12
+alwaysBtn.Font = Enum.Font.GothamMedium
+alwaysBtn.Parent = main
+Instance.new("UICorner", alwaysBtn).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", alwaysBtn).Color = Color3.fromRGB(50, 50, 50)
+
+local espBtn = Instance.new("TextButton")
+espBtn.Size = UDim2.new(1, -20, 0, 22)
+espBtn.Position = UDim2.new(0, 10, 0, 77)
+espBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+espBtn.BorderSizePixel = 0
+espBtn.Text = "ESP: OFF"
+espBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+espBtn.TextSize = 12
+espBtn.Font = Enum.Font.GothamMedium
+espBtn.Parent = main
+Instance.new("UICorner", espBtn).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", espBtn).Color = Color3.fromRGB(50, 50, 50)
+
+local headLabel = Instance.new("TextLabel")
+headLabel.Size = UDim2.new(0, 90, 0, 22)
+headLabel.Position = UDim2.new(0, 10, 0, 106)
+headLabel.BackgroundTransparency = 1
+headLabel.Text = "Head Scale:"
+headLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
+headLabel.TextSize = 12
+headLabel.Font = Enum.Font.GothamMedium
+headLabel.TextXAlignment = Enum.TextXAlignment.Left
+headLabel.Parent = main
+
+local headBox = Instance.new("TextBox")
+headBox.Size = UDim2.new(0, 100, 0, 22)
+headBox.Position = UDim2.new(0, 110, 0, 106)
+headBox.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+headBox.BorderSizePixel = 0
+headBox.Text = "1"
+headBox.PlaceholderText = "1"
+headBox.TextColor3 = Color3.fromRGB(200, 200, 200)
+headBox.TextSize = 12
+headBox.Font = Enum.Font.GothamMedium
+headBox.ClearTextOnFocus = false
+headBox.Parent = main
+Instance.new("UICorner", headBox).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", headBox).Color = Color3.fromRGB(50, 50, 50)
+
+local friendLabel = Instance.new("TextLabel")
+friendLabel.Size = UDim2.new(1, -20, 0, 18)
+friendLabel.Position = UDim2.new(0, 10, 0, 135)
+friendLabel.BackgroundTransparency = 1
+friendLabel.Text = "Friends / Whitelist"
+friendLabel.TextColor3 = Color3.fromRGB(120, 180, 255)
+friendLabel.TextSize = 11
+friendLabel.Font = Enum.Font.GothamMedium
+friendLabel.TextXAlignment = Enum.TextXAlignment.Left
+friendLabel.Parent = main
+
+local nameBox = Instance.new("TextBox")
+nameBox.Size = UDim2.new(1, -20, 0, 22)
+nameBox.Position = UDim2.new(0, 10, 0, 155)
+nameBox.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+nameBox.BorderSizePixel = 0
+nameBox.Text = ""
+nameBox.PlaceholderText = "Username / DisplayName"
+nameBox.TextColor3 = Color3.fromRGB(200, 200, 200)
+nameBox.TextSize = 12
+nameBox.Font = Enum.Font.GothamMedium
+nameBox.ClearTextOnFocus = false
+nameBox.Parent = main
+Instance.new("UICorner", nameBox).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", nameBox).Color = Color3.fromRGB(50, 50, 50)
+
+local addBtn = Instance.new("TextButton")
+addBtn.Size = UDim2.new(0.48, -5, 0, 22)
+addBtn.Position = UDim2.new(0, 10, 0, 183)
+addBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+addBtn.BorderSizePixel = 0
+addBtn.Text = "Add"
+addBtn.TextColor3 = Color3.fromRGB(100, 220, 100)
+addBtn.TextSize = 12
+addBtn.Font = Enum.Font.GothamMedium
+addBtn.Parent = main
+Instance.new("UICorner", addBtn).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", addBtn).Color = Color3.fromRGB(50, 50, 50)
+
+local removeBtn = Instance.new("TextButton")
+removeBtn.Size = UDim2.new(0.48, -5, 0, 22)
+removeBtn.Position = UDim2.new(0.52, 5, 0, 183)
+removeBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+removeBtn.BorderSizePixel = 0
+removeBtn.Text = "Remove"
+removeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+removeBtn.TextSize = 12
+removeBtn.Font = Enum.Font.GothamMedium
+removeBtn.Parent = main
+Instance.new("UICorner", removeBtn).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", removeBtn).Color = Color3.fromRGB(50, 50, 50)
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 18)
+statusLabel.Position = UDim2.new(0, 10, 0, 210)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Whitelisted: 0"
+statusLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
+statusLabel.TextSize = 11
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = main
+
+local function updateStatus()
+	local count = 0
+	for _ in pairs(whitelist) do count += 1 end
+	statusLabel.Text = "Whitelisted: " .. count
 end
 
-local normalSize = UDim2.new(0, 540, 0, 380)
-local normalPos  = UDim2.new(0.5, -270, 0.5, -190)
-local isFullscreen = false
-local isHidden = false
+local function isFriendOrWhitelisted(plr)
+	if not plr or plr == lp then return false end
 
--- Mini restore button (shown when hidden)
-local miniBtn = Instance.new("TextButton", gui)
-miniBtn.Size             = UDim2.new(0, 120, 0, 28)
-miniBtn.Position         = UDim2.new(0, 10, 0, 10)
-miniBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
-miniBtn.BorderSizePixel  = 0
-miniBtn.Text             = "Eddie's Hub"
-miniBtn.TextColor3       = C.text
-miniBtn.Font             = Enum.Font.GothamBlack
-miniBtn.TextSize         = 12
-miniBtn.AutoButtonColor  = false
-miniBtn.Visible          = false
-miniBtn.ZIndex           = 200
-Instance.new("UICorner", miniBtn).CornerRadius = UDim.new(0, 6)
-local miniStroke = Instance.new("UIStroke", miniBtn)
-miniStroke.Color = C.accent
-miniStroke.Thickness = 1
-miniBtn.MouseButton1Click:Connect(function()
-    isHidden = false
-    win.Visible = true
-    miniBtn.Visible = false
-end)
-miniBtn.MouseEnter:Connect(function()
-    TweenService:Create(miniBtn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(40,40,40)}):Play()
-end)
-miniBtn.MouseLeave:Connect(function()
-    TweenService:Create(miniBtn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(28,28,28)}):Play()
-end)
+	local nameLower = string.lower(plr.Name)
+	local displayLower = string.lower(plr.DisplayName)
+	if whitelist[nameLower] or whitelist[displayLower] then
+		return true
+	end
 
--- RED: Destroy UI
-local redBtn = trafficBtn(bar, 14, C.red, "x")
-redBtn.MouseButton1Click:Connect(function()
-    TweenService:Create(win, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-        Size = UDim2.new(0, 0, 0, 0),
-        BackgroundTransparency = 1
-    }):Play()
-    task.delay(0.22, function() gui:Destroy() end)
-end)
+	local success, isFriend = pcall(function()
+		return lp:IsFriendsWith(plr.UserId)
+	end)
+	if success and isFriend then
+		return true
+	end
 
--- YELLOW: Hide to mini button
-local yellowBtn = trafficBtn(bar, 34, C.yellow, "-")
-yellowBtn.MouseButton1Click:Connect(function()
-    isHidden = true
-    win.Visible = false
-    miniBtn.Visible = true
-end)
-
--- GREEN: Toggle fullscreen
-local greenBtn = trafficBtn(bar, 54, C.green, "+")
-greenBtn.MouseButton1Click:Connect(function()
-    isFullscreen = not isFullscreen
-    if isFullscreen then
-        TweenService:Create(win, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-            Size     = UDim2.new(1, 0, 1, 0),
-            Position = UDim2.new(0, 0, 0, 0)
-        }):Play()
-    else
-        TweenService:Create(win, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-            Size     = normalSize,
-            Position = normalPos
-        }):Play()
-    end
-end)
-
--- Folder icon + title
-local titleLbl = Instance.new("TextLabel", bar)
-titleLbl.Size                = UDim2.new(1, -120, 1, 0)
-titleLbl.Position            = UDim2.new(0, 74, 0, 0)
-titleLbl.BackgroundTransparency = 1
-titleLbl.Text                = "Eddie's Hub"
-titleLbl.TextColor3          = C.text
-titleLbl.Font                = Enum.Font.GothamBlack
-titleLbl.TextSize            = 14
-titleLbl.TextXAlignment      = Enum.TextXAlignment.Left
-
--- ── Sidebar ───────────────────────────────────────────────
-local sidebar = Instance.new("Frame", win)
-sidebar.Name             = "Sidebar"
-sidebar.Size             = UDim2.new(0, 160, 1, -38)
-sidebar.Position         = UDim2.new(0, 0, 0, 38)
-sidebar.BackgroundColor3 = C.sidebar
-sidebar.BorderSizePixel  = 0
-
-local sideList = Instance.new("UIListLayout", sidebar)
-sideList.SortOrder  = Enum.SortOrder.LayoutOrder
-sideList.Padding    = UDim.new(0, 2)
-local sidePad = Instance.new("UIPadding", sidebar)
-sidePad.PaddingTop    = UDim.new(0, 8)
-sidePad.PaddingLeft   = UDim.new(0, 6)
-sidePad.PaddingRight  = UDim.new(0, 6)
-sidePad.PaddingBottom = UDim.new(0, 8)
-
--- Sidebar divider
-local sideDiv = Instance.new("Frame", win)
-sideDiv.Size             = UDim2.new(0, 1, 1, -38)
-sideDiv.Position         = UDim2.new(0, 160, 0, 38)
-sideDiv.BackgroundColor3 = C.border
-sideDiv.BorderSizePixel  = 0
-
--- ── Content area ──────────────────────────────────────────
-local content = Instance.new("Frame", win)
-content.Name             = "Content"
-content.Size             = UDim2.new(1, -161, 1, -38)
-content.Position         = UDim2.new(0, 161, 0, 38)
-content.BackgroundTransparency = 1
-content.ClipsDescendants = true
-
--- ── Dragging ──────────────────────────────────────────────
-local dragging, dragStart, winStart = false, nil, nil
-bar.InputBegan:Connect(function(inp)
-    if inp.UserInputType == Enum.UserInputType.MouseButton1
-    or inp.UserInputType == Enum.UserInputType.Touch then
-        dragging = true; dragStart = inp.Position; winStart = win.Position
-    end
-end)
-bar.InputEnded:Connect(function(inp)
-    if inp.UserInputType == Enum.UserInputType.MouseButton1
-    or inp.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
-    end
-end)
-UIS.InputChanged:Connect(function(inp)
-    if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement
-    or inp.UserInputType == Enum.UserInputType.Touch) then
-        local dx = inp.Position.X - dragStart.X
-        local dy = inp.Position.Y - dragStart.Y
-        win.Position = UDim2.new(winStart.X.Scale, winStart.X.Offset+dx,
-                                  winStart.Y.Scale, winStart.Y.Offset+dy)
-    end
-end)
-
--- ── Toast notification ────────────────────────────────────
-local toastFrame = Instance.new("Frame", gui)
-toastFrame.Size             = UDim2.new(0, 260, 0, 40)
-toastFrame.Position         = UDim2.new(0.5, -130, 0, -50)
-toastFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-toastFrame.BorderSizePixel  = 0
-toastFrame.ZIndex           = 200
-Instance.new("UICorner", toastFrame).CornerRadius = UDim.new(0, 8)
-local toastStroke = Instance.new("UIStroke", toastFrame)
-toastStroke.Color = C.border
-
-local toastLbl = Instance.new("TextLabel", toastFrame)
-toastLbl.Size                = UDim2.new(1, -16, 1, 0)
-toastLbl.Position            = UDim2.new(0, 8, 0, 0)
-toastLbl.BackgroundTransparency = 1
-toastLbl.TextColor3          = C.text
-toastLbl.Font                = Enum.Font.GothamBold
-toastLbl.TextSize            = 13
-toastLbl.ZIndex              = 201
-
-local function toast(msg, col)
-    toastLbl.Text       = msg
-    toastStroke.Color   = col or C.accent
-    TweenService:Create(toastFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad),
-        {Position = UDim2.new(0.5, -130, 0, 12)}):Play()
-    task.delay(2.5, function()
-        TweenService:Create(toastFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad),
-            {Position = UDim2.new(0.5, -130, 0, -50)}):Play()
-    end)
+	return false
 end
 
--- ── Build category pages & sidebar tabs ───────────────────
-local pages   = {}
-local tabBtns = {}
-local activeCat = nil
+local function isLookingAtEnemy()
+	local unitRay = Camera:ScreenPointToRay(mouse.X, mouse.Y)
+	local params = RaycastParams.new()
+	params.FilterDescendantsInstances = {lp.Character}
+	params.FilterType = Enum.RaycastFilterType.Exclude
 
-local function setCategory(name)
-    if activeCat == name then return end
-    activeCat = name
-    for n, page in pairs(pages) do
-        page.Visible = (n == name)
-    end
-    for n, btn in pairs(tabBtns) do
-        local isOn = (n == name)
-        btn.BackgroundColor3 = isOn and C.tabSel or Color3.fromRGB(0,0,0)
-        btn.BackgroundTransparency = isOn and 0 or 1
-        local lbl = btn:FindFirstChildOfClass("TextLabel")
-        if lbl then lbl.TextColor3 = isOn and C.white or C.textDim end
-        local corner = btn:FindFirstChildOfClass("UICorner")
-        if corner then end
-    end
+	local result = workspace:Raycast(unitRay.Origin, unitRay.Direction * 1000, params)
+	if not result then return false end
+
+	local model = result.Instance:FindFirstAncestorOfClass("Model")
+	if not model then return false end
+
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return false end
+	local targetPlayer = Players:GetPlayerFromCharacter(model)
+	if targetPlayer then		if isFriendOrWhitelisted(targetPlayer) then
+			return false
+		end
+		return true
+	end
+
+	return true
 end
 
-for ci, cat in ipairs(CATEGORIES) do
-    -- ── Sidebar tab button ──────────────────────────────
-    local tab = Instance.new("TextButton", sidebar)
-    tab.Size                = UDim2.new(1, 0, 0, 36)
-    tab.BackgroundColor3    = Color3.fromRGB(0,0,0)
-    tab.BackgroundTransparency = 1
-    tab.BorderSizePixel     = 0
-    tab.Text                = ""
-    tab.AutoButtonColor     = false
-    tab.LayoutOrder         = ci
-    Instance.new("UICorner", tab).CornerRadius = UDim.new(0, 8)
-
-    -- Colored icon pill
-    local iconPill = Instance.new("Frame", tab)
-    iconPill.Size             = UDim2.new(0, 28, 0, 28)
-    iconPill.Position         = UDim2.new(0, 6, 0.5, -14)
-    iconPill.BackgroundColor3 = cat.color
-    iconPill.BorderSizePixel  = 0
-    Instance.new("UICorner", iconPill).CornerRadius = UDim.new(0, 7)
-    local iconLbl = Instance.new("TextLabel", iconPill)
-    iconLbl.Size                = UDim2.new(1, 0, 1, 0)
-    iconLbl.BackgroundTransparency = 1
-    iconLbl.Text                = cat.icon
-    iconLbl.TextSize            = 14
-    iconLbl.Font                = Enum.Font.GothamBold
-    iconLbl.TextColor3          = C.white
-
-    -- Category name
-    local nameLbl = Instance.new("TextLabel", tab)
-    nameLbl.Size                = UDim2.new(1, -46, 1, 0)
-    nameLbl.Position            = UDim2.new(0, 42, 0, 0)
-    nameLbl.BackgroundTransparency = 1
-    nameLbl.Text                = cat.name
-    nameLbl.TextColor3          = C.textDim
-    nameLbl.Font                = Enum.Font.GothamBold
-    nameLbl.TextSize            = 12
-    nameLbl.TextXAlignment      = Enum.TextXAlignment.Left
-    nameLbl.TextWrapped         = true
-
-    tab.MouseEnter:Connect(function()
-        if activeCat ~= cat.name then
-            TweenService:Create(tab, TweenInfo.new(0.1), {BackgroundTransparency = 0.7}):Play()
-        end
-    end)
-    tab.MouseLeave:Connect(function()
-        if activeCat ~= cat.name then
-            TweenService:Create(tab, TweenInfo.new(0.1), {BackgroundTransparency = 1}):Play()
-        end
-    end)
-    tab.MouseButton1Click:Connect(function() setCategory(cat.name) end)
-    tabBtns[cat.name] = tab
-
-    -- ── Content page ────────────────────────────────────
-    local page = Instance.new("ScrollingFrame", content)
-    page.Name               = cat.name
-    page.Size               = UDim2.new(1, 0, 1, 0)
-    page.BackgroundTransparency = 1
-    page.BorderSizePixel    = 0
-    page.ScrollBarThickness = 3
-    page.ScrollBarImageColor3 = C.border
-    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    page.CanvasSize         = UDim2.new(0, 0, 0, 0)
-    page.Visible            = false
-
-    local pageList = Instance.new("UIListLayout", page)
-    pageList.SortOrder = Enum.SortOrder.LayoutOrder
-    pageList.Padding   = UDim.new(0, 8)
-    local pagePad = Instance.new("UIPadding", page)
-    pagePad.PaddingTop    = UDim.new(0, 14)
-    pagePad.PaddingLeft   = UDim.new(0, 12)
-    pagePad.PaddingRight  = UDim.new(0, 12)
-    pagePad.PaddingBottom = UDim.new(0, 14)
-
-    -- Section header
-    local header = Instance.new("TextLabel", page)
-    header.Size                = UDim2.new(1, 0, 0, 22)
-    header.BackgroundTransparency = 1
-    header.Text                = "Best " .. cat.name .. " Scripts"
-    header.TextColor3          = C.text
-    header.Font                = Enum.Font.GothamBlack
-    header.TextSize            = 15
-    header.TextXAlignment      = Enum.TextXAlignment.Left
-    header.LayoutOrder         = 0
-
-    -- Script cards
-    for si, scr in ipairs(cat.scripts) do
-        local card = Instance.new("TextButton", page)
-        card.Size                = UDim2.new(1, 0, 0, 72)
-        card.BackgroundColor3    = C.card
-        card.BorderSizePixel     = 0
-        card.Text                = ""
-        card.AutoButtonColor     = false
-        card.LayoutOrder         = si
-        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
-
-        -- Script name
-        local sName = Instance.new("TextLabel", card)
-        sName.Size               = UDim2.new(1, -56, 0, 22)
-        sName.Position           = UDim2.new(0, 14, 0, 12)
-        sName.BackgroundTransparency = 1
-        sName.Text               = scr.name .. "  (" .. scr.key .. ")"
-        sName.TextColor3         = C.text
-        sName.Font               = Enum.Font.GothamBlack
-        sName.TextSize           = 14
-        sName.TextXAlignment     = Enum.TextXAlignment.Left
-
-        -- Description
-        local sDesc = Instance.new("TextLabel", card)
-        sDesc.Size               = UDim2.new(1, -56, 0, 34)
-        sDesc.Position           = UDim2.new(0, 14, 0, 34)
-        sDesc.BackgroundTransparency = 1
-        sDesc.Text               = scr.desc
-        sDesc.TextColor3         = C.textDim
-        sDesc.Font               = Enum.Font.Gotham
-        sDesc.TextSize           = 12
-        sDesc.TextXAlignment     = Enum.TextXAlignment.Left
-        sDesc.TextWrapped        = true
-
-        -- Icon circle
-        local iconCircle = Instance.new("Frame", card)
-        iconCircle.Size             = UDim2.new(0, 36, 0, 36)
-        iconCircle.Position         = UDim2.new(1, -46, 0.5, -18)
-        iconCircle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        iconCircle.BorderSizePixel  = 0
-        Instance.new("UICorner", iconCircle).CornerRadius = UDim.new(1, 0)
-        local iconTxt = Instance.new("TextLabel", iconCircle)
-        iconTxt.Size                = UDim2.new(1, 0, 1, 0)
-        iconTxt.BackgroundTransparency = 1
-        iconTxt.Text                = scr.icon
-        iconTxt.TextSize            = 18
-        iconTxt.Font                = Enum.Font.GothamBold
-        iconTxt.TextColor3          = C.textDim
-
-        -- Status dot (shows loading state)
-        local statusDot = Instance.new("Frame", card)
-        statusDot.Size             = UDim2.new(0, 7, 0, 7)
-        statusDot.Position         = UDim2.new(0, 14, 0, 0)
-        statusDot.BackgroundColor3 = C.textDim
-        statusDot.BorderSizePixel  = 0
-        statusDot.Visible          = false
-        Instance.new("UICorner", statusDot).CornerRadius = UDim.new(1, 0)
-
-        -- Hover effects
-        card.MouseEnter:Connect(function()
-            TweenService:Create(card, TweenInfo.new(0.12), {BackgroundColor3 = C.cardHov}):Play()
-            TweenService:Create(iconCircle, TweenInfo.new(0.12), {BackgroundColor3 = cat.color}):Play()
-            TweenService:Create(iconTxt, TweenInfo.new(0.12), {TextColor3 = C.white}):Play()
-        end)
-        card.MouseLeave:Connect(function()
-            TweenService:Create(card, TweenInfo.new(0.12), {BackgroundColor3 = C.card}):Play()
-            TweenService:Create(iconCircle, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(50,50,50)}):Play()
-            TweenService:Create(iconTxt, TweenInfo.new(0.12), {TextColor3 = C.textDim}):Play()
-        end)
-
-        -- Click → execute script
-        local loaded = false
-        card.MouseButton1Click:Connect(function()
-            if loaded then
-                toast("Already loaded: " .. scr.name, C.yellow)
-                return
-            end
-            -- Visual feedback: turn icon orange while loading
-            TweenService:Create(iconCircle, TweenInfo.new(0.1), {BackgroundColor3 = C.accent}):Play()
-            iconTxt.Text = "⏳"
-            sName.TextColor3 = C.textDim
-            toast("Loading " .. scr.name .. "...", C.accent)
-
-            task.spawn(function()
-                local ok, err = pcall(function()
-                    loadstring(game:HttpGet(scr.url, true))()
-                end)
-                if ok then
-                    loaded = true
-                    -- Success state
-                    TweenService:Create(iconCircle, TweenInfo.new(0.2), {BackgroundColor3 = C.green}):Play()
-                    iconTxt.Text       = "✓"
-                    sName.TextColor3   = C.green
-                    toast("✓ " .. scr.name .. " loaded!", C.green)
-                else
-                    -- Error state
-                    TweenService:Create(iconCircle, TweenInfo.new(0.2), {BackgroundColor3 = C.red}):Play()
-                    iconTxt.Text       = "✕"
-                    sName.TextColor3   = C.red
-                    toast("✕ Failed: " .. tostring(err):sub(1, 40), C.red)
-                    task.delay(3, function()
-                        -- Reset so user can retry
-                        TweenService:Create(iconCircle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50,50,50)}):Play()
-                        iconTxt.Text     = scr.icon
-                        sName.TextColor3 = C.text
-                    end)
-                end
-            end)
-        end)
-    end
-
-    pages[cat.name] = page
+local function startSimulate()
+	if isSimulating then return end
+	isSimulating = true
+	mouse1press()
 end
 
--- ── Select first category ─────────────────────────────────
-setCategory(CATEGORIES[1].name)
+local function stopSimulate()
+	if not isSimulating then return end
+	isSimulating = false
+	mouse1release()
+end
 
--- ── Startup toast ─────────────────────────────────────────
-task.wait(0.3)
-toast("Eddie's Hub loaded", C.accent)
+local function getOrStoreOriginal(head)
+	if not originalHeadSizes[head] then
+		originalHeadSizes[head] = head.Size
+	end
+	return originalHeadSizes[head]
+end
+
+local function applyHeadScale(head, plr)
+	if not head or not head:IsA("BasePart") then return end
+	if plr and isFriendOrWhitelisted(plr) then
+		local orig = getOrStoreOriginal(head)
+		head.Size = orig
+		return
+	end
+	local orig = getOrStoreOriginal(head)
+	head.Size = orig * headMult
+end
+
+local function scaleAllHeads()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		local char = plr.Character
+		if char then
+			local head = char:FindFirstChild("Head")
+			if head then applyHeadScale(head, plr) end
+		end
+	end
+
+	for _, model in ipairs(workspace:GetDescendants()) do
+		if model:IsA("Model") and model:FindFirstChildOfClass("Humanoid") then
+			local isPlayerChar = false
+			for _, plr in ipairs(Players:GetPlayers()) do
+				if plr.Character == model then
+					isPlayerChar = true
+					break
+				end
+			end
+			if not isPlayerChar then
+				local head = model:FindFirstChild("Head")
+				if head then applyHeadScale(head, nil) end
+			end
+		end
+	end
+end
+
+Players.PlayerAdded:Connect(function(plr)
+	plr.CharacterAdded:Connect(function(char)
+		task.wait(0.3)
+		local head = char:FindFirstChild("Head")
+		if head then applyHeadScale(head, plr) end
+	end)
+end)
+
+for _, plr in ipairs(Players:GetPlayers()) do
+	plr.CharacterAdded:Connect(function(char)
+		task.wait(0.3)
+		local head = char:FindFirstChild("Head")
+		if head then applyHeadScale(head, plr) end
+	end)
+end
+
+local function createPlayerHighlight(plr)
+	if highlights[plr] then
+		highlights[plr]:Destroy()
+		highlights[plr] = nil
+	end
+
+	local char = plr.Character
+	if not char then return end
+
+	local isFriend = isFriendOrWhitelisted(plr)
+
+	local hl = Instance.new("Highlight")
+	hl.Name = "ESP_Highlight"
+	hl.Adornee = char
+	hl.FillTransparency = 0.6
+	hl.OutlineTransparency = 0
+	hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+
+	if isFriend then
+		hl.FillColor = Color3.fromRGB(80, 140, 255)
+		hl.OutlineColor = Color3.fromRGB(180, 220, 255)
+	else
+		hl.FillColor = Color3.fromRGB(255, 80, 80)
+		hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+	end
+
+	hl.Parent = char
+	highlights[plr] = hl
+end
+
+local function createNpcHighlight(model)
+	if npcHighlights[model] then
+		npcHighlights[model]:Destroy()
+		npcHighlights[model] = nil
+	end
+
+	if not model or not model.Parent then return end
+
+	local hl = Instance.new("Highlight")
+	hl.Name = "ESP_NPC_Highlight"
+	hl.Adornee = model
+	hl.FillColor = Color3.fromRGB(255, 80, 80)
+	hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+	hl.FillTransparency = 0.6
+	hl.OutlineTransparency = 0
+	hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	hl.Parent = model
+
+	npcHighlights[model] = hl
+end
+
+local function removePlayerHighlight(plr)
+	if highlights[plr] then
+		highlights[plr]:Destroy()
+		highlights[plr] = nil
+	end
+end
+
+local function clearAllNPCHighlights()
+	for model, hl in pairs(npcHighlights) do
+		if hl then hl:Destroy() end
+	end
+	table.clear(npcHighlights)
+end
+
+local function refreshESP()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= lp then
+			if espEnabled then
+				createPlayerHighlight(plr)
+			else
+				removePlayerHighlight(plr)
+			end
+		end
+	end
+
+	if not espEnabled then
+		clearAllNPCHighlights()
+		return
+	end
+
+	local currentNPCs = {}
+
+	for _, model in ipairs(workspace:GetDescendants()) do
+		if model:IsA("Model") and model:FindFirstChildOfClass("Humanoid") then
+			local isPlayer = false
+			for _, plr in ipairs(Players:GetPlayers()) do
+				if plr.Character == model then
+					isPlayer = true
+					break
+				end
+			end
+
+			if not isPlayer then
+				currentNPCs[model] = true
+				if not npcHighlights[model] then
+					createNpcHighlight(model)
+				end
+			end
+		end
+	end
+
+	for model, hl in pairs(npcHighlights) do
+		if not currentNPCs[model] or not model.Parent then
+			if hl then hl:Destroy() end
+			npcHighlights[model] = nil
+		end
+	end
+end
+
+espBtn.MouseButton1Click:Connect(function()
+	espEnabled = not espEnabled
+	espBtn.Text = espEnabled and "ESP: ON" or "ESP: OFF"
+	espBtn.TextColor3 = espEnabled and Color3.fromRGB(100, 220, 100) or Color3.fromRGB(200, 200, 200)
+	refreshESP()
+end)
+
+Players.PlayerAdded:Connect(function(plr)
+	if plr == lp then return end
+	plr.CharacterAdded:Connect(function()
+		task.wait(0.4)
+		if espEnabled then
+			createPlayerHighlight(plr)
+		end
+	end)
+end)
+
+for _, plr in ipairs(Players:GetPlayers()) do
+	if plr ~= lp then
+		plr.CharacterAdded:Connect(function()
+			task.wait(0.4)
+			if espEnabled then
+				createPlayerHighlight(plr)
+			end
+		end)
+	end
+end
+
+Players.PlayerRemoving:Connect(function(plr)
+	removePlayerHighlight(plr)
+end)
+
+task.spawn(function()
+	while true do
+		task.wait(1.5)
+		if espEnabled then
+			refreshESP()
+		end
+		if headMult ~= 1 then
+			scaleAllHeads()
+		end
+	end
+end)
+
+addBtn.MouseButton1Click:Connect(function()
+	local text = string.lower(string.gsub(nameBox.Text, "%s+", ""))
+	if text == "" then return end
+
+	whitelist[text] = true
+	nameBox.Text = ""
+	updateStatus()
+
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if string.lower(plr.Name) == text or string.lower(plr.DisplayName) == text then
+			if espEnabled then createPlayerHighlight(plr) end
+			local head = plr.Character and plr.Character:FindFirstChild("Head")
+			if head then applyHeadScale(head, plr) end
+		end
+	end
+end)
+
+removeBtn.MouseButton1Click:Connect(function()
+	local text = string.lower(string.gsub(nameBox.Text, "%s+", ""))
+	if text == "" then return end
+
+	whitelist[text] = nil
+	nameBox.Text = ""
+	updateStatus()
+
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if string.lower(plr.Name) == text or string.lower(plr.DisplayName) == text then
+			if espEnabled then createPlayerHighlight(plr) end
+			local head = plr.Character and plr.Character:FindFirstChild("Head")
+			if head then applyHeadScale(head, plr) end
+		end
+	end
+end)
+
+alwaysBtn.MouseButton1Click:Connect(function()
+	alwaysOn = not alwaysOn
+	alwaysBtn.Text = alwaysOn and "Always On: ON" or "Always On: OFF"
+	alwaysBtn.TextColor3 = alwaysOn and Color3.fromRGB(100, 220, 100) or Color3.fromRGB(200, 200, 200)
+	if not alwaysOn then
+		stopSimulate()
+	end
+end)
+
+headBox.FocusLost:Connect(function()
+	local num = tonumber(headBox.Text)
+	if num and num > 0 then
+		headMult = num
+		headBox.Text = tostring(num)
+		scaleAllHeads()
+	else
+		headBox.Text = tostring(headMult)
+	end
+end)
+
+local inputConn = nil
+
+btn.MouseButton1Click:Connect(function()
+	if listening then return end
+	listening = true
+	btn.Text = "Shoot Keybind: [ press a button ]"
+	btn.TextColor3 = Color3.fromRGB(255, 200, 50)
+
+	if inputConn then inputConn:Disconnect() end
+
+	inputConn = UserInputService.InputBegan:Connect(function(input, gp)
+		if gp then return end
+
+		if input.UserInputType == Enum.UserInputType.Keyboard
+			or input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.MouseButton2
+			or input.UserInputType == Enum.UserInputType.MouseButton3
+		then
+			shootKey = input.UserInputType ~= Enum.UserInputType.Keyboard
+				and input.UserInputType
+				or input.KeyCode
+
+			listening = false
+			local name = input.UserInputType == Enum.UserInputType.Keyboard
+				and tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
+				or tostring(input.UserInputType):gsub("Enum.UserInputType.", "")
+
+			btn.Text = "Shoot Keybind: [ " .. name .. " ]"
+			btn.TextColor3 = Color3.fromRGB(100, 220, 100)
+			inputConn:Disconnect()
+		end
+	end)
+end)
+
+RunService.RenderStepped:Connect(function()
+	local shouldShoot = false
+
+	if alwaysOn then
+		shouldShoot = isLookingAtEnemy()
+	elseif shootKey then
+		local held = false
+		if typeof(shootKey) == "EnumItem" and shootKey.EnumType == Enum.KeyCode then
+			held = UserInputService:IsKeyDown(shootKey)
+		elseif shootKey == Enum.UserInputType.MouseButton1 then
+			held = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+		elseif shootKey == Enum.UserInputType.MouseButton2 then
+			held = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+		elseif shootKey == Enum.UserInputType.MouseButton3 then
+			held = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton3)
+		end
+		shouldShoot = held and isLookingAtEnemy()
+	end
+
+	if shouldShoot then
+		startSimulate()
+	else
+		stopSimulate()
+	end
+end)
+
+updateStatus()
