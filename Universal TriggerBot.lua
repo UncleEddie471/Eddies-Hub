@@ -69,6 +69,13 @@ local CATEGORIES = {
                 icon  = "🎯",
                 url   = "https://raw.githubusercontent.com/UncleEddie471/Universal-Aimbot/refs/heads/main/Eddies_aimbot.lua",
             },
+            {
+                name  = "Eddie's Universal Hub",
+                key   = "Keyless",
+                desc  = "All-in-one universal hub — works on any game",
+                icon  = "🌐",
+                url   = "https://raw.githubusercontent.com/UncleEddie471/Universal-Hub/refs/heads/main/Eddies.lua",
+            },
         },
     },
     {
@@ -111,13 +118,7 @@ local CATEGORIES = {
                 icon  = "🔒",
                 url   = "https://raw.githubusercontent.com/CratosHub-Dev/XenaHub/refs/heads/main/MM2FreezeTrade",
             },
-            {
-                name  = "Wisteria MM2",
-                key   = "Keyless",
-                desc  = "All-in-one MM2 script — Aimbot, ESP, Auto Farm & utilities",
-                icon  = "🌸",
-                url   = "https://raw.githubusercontent.com/Wisteriammy/-/refs/heads/main/mm2.lua",
-            },
+
         },
     },
 }
